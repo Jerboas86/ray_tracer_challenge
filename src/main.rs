@@ -1,8 +1,10 @@
 use crate::{
+    canvas::Canvas,
     math::{Point, Vector},
     sim::{Environment, Projectile, Simulator},
 };
 
+mod canvas;
 mod math;
 mod sim;
 
@@ -13,22 +15,17 @@ fn main() {
         gravity: Vector::new(0., -0.1, 0.),
         wind: Vector::new(-0.01, 0., 0.),
     };
+
     let proj = Projectile {
         pos: Point::new(0., 1., 0.),
-        v: Vector::new(1., 1., 0.).normalize(),
+        v: 11.25 * Vector::new(1., 1.8, 0.).normalize(),
     };
+
+    let mut cv = Canvas::new(900, 550, None);
 
     let mut canon = Simulator::new(env, proj);
 
-    println!("Canon ball running...");
+    let ppm = canon.draw(&mut cv);
 
-    loop {
-        let new_proj = canon.tick();
-        println!("Still flying...");
-
-        if new_proj.pos.1 <= 0. {
-            println!("Hit ground !!!");
-            break;
-        }
-    }
+    ppm.write_to_file("trajectory.ppm");
 }

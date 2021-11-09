@@ -156,6 +156,18 @@ impl Mul<&Vector> for f32 {
     }
 }
 
+impl Mul<Vector> for f32 {
+    type Output = Vector;
+
+    fn mul(self, mut rhs: Vector) -> Self::Output {
+        rhs.0 *= self;
+        rhs.1 *= self;
+        rhs.2 *= self;
+
+        rhs
+    }
+}
+
 impl Div<f32> for &Vector {
     type Output = Vector;
 
