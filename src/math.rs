@@ -1,4 +1,7 @@
-use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub};
+use std::{
+    f32::EPSILON,
+    ops::{Add, AddAssign, Deref, DerefMut, Div, Mul, Neg, Sub},
+};
 
 use float_eq::float_eq;
 
@@ -176,13 +179,90 @@ impl Div<f32> for &Vector {
     }
 }
 
+pub struct Matrix<const N: usize>([[f32; N]; N]);
+
+pub trait Matrixable<const N: usize> {
+    fn new(arr: [[f32; N]; N]) -> Self;
+}
+
+impl<const N: usize> Matrixable<N> for Matrix<N> {
+    fn new(arr: [[f32; N]; N]) -> Self {
+        Self(arr)
+    }
+}
+
+impl<const N: usize> Default for Matrix<N> {
+    fn default() -> Self {
+        Self([[0.; N]; N])
+    }
+}
+
+impl<const N: usize> Deref for Matrix<N> {
+    type Target = [[f32; N]; N];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<const N: usize> DerefMut for Matrix<N> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<const N: usize> Mul for Matrix<N> {
+    type Output = Matrix<N>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut res = Matrix::default();
+
+        for row in 0..N {
+            for col in 0..N {
+                for i in 0..N {
+                    res[row][col] += self[row][i] * rhs[i][col];
+                }
+            }
+        }
+        res
+    }
+}
+
+impl<const N: usize> Mul for &Matrix<N> {
+    type Output = Matrix<N>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut res = Matrix::default();
+
+        for row in 0..N {
+            for col in 0..N {
+                for i in 0..N {
+                    res[row][col] += self[row][i] * rhs[i][col];
+                }
+            }
+        }
+        res
+    }
+}
+
+impl<const N: usize> PartialEq for Matrix<N> {
+    fn eq(&self, other: &Self) -> bool {
+        for (a, b) in self.iter().flatten().zip(other.iter().flatten()) {
+            if !float_eq!(a, b, abs <= EPSILON) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::f32::EPSILON;
 
     use float_eq::assert_float_eq;
 
-    use crate::math::{Point, Vector};
+    use crate::math::{Matrix, Matrixable, Point, Vector};
 
     #[test]
     fn create_a_point() {
@@ -379,5 +459,109 @@ mod test {
         assert_float_eq!(v3.0, ref_vec.0, abs <= EPSILON);
         assert_float_eq!(v3.1, ref_vec.1, abs <= EPSILON);
         assert_float_eq!(v3.2, ref_vec.2, abs <= EPSILON);
+    }
+
+    #[test]
+    fn constructs_and_inspects_4x4_matrix() {
+        let m = Matrix::new([
+            [1., 2., 3., 4.],
+            [5.5, 6.5, 7.5, 8.5],
+            [9., 10., 11., 12.],
+            [13.5, 14.5, 15.5, 16.5],
+        ]);
+
+        assert_float_eq!(m[0][0], 1., abs <= EPSILON);
+        assert_float_eq!(m[0][3], 4., abs <= EPSILON);
+        assert_float_eq!(m[1][0], 5.5, abs <= EPSILON);
+        assert_float_eq!(m[1][2], 7.5, abs <= EPSILON);
+        assert_float_eq!(m[2][2], 11., abs <= EPSILON);
+        assert_float_eq!(m[3][0], 13.5, abs <= EPSILON);
+        assert_float_eq!(m[3][2], 15.5, abs <= EPSILON);
+    }
+
+    #[test]
+    fn constructs_and_inspects_3x3_matrix() {
+        let m = Matrix::new([[-3., 5., 0.], [1., -2., -7.], [0., 0., 1.]]);
+
+        assert_float_eq!(m[0][0], -3., abs <= EPSILON);
+        assert_float_eq!(m[0][1], 5., abs <= EPSILON);
+        assert_float_eq!(m[1][0], 1., abs <= EPSILON);
+        assert_float_eq!(m[1][1], -2., abs <= EPSILON);
+        assert_float_eq!(m[2][2], 1., abs <= EPSILON);
+    }
+
+    #[test]
+    fn constructs_and_inspects_2x2_matrix() {
+        let m = Matrix::new([[-3., 5.], [1., -2.]]);
+
+        assert_float_eq!(m[0][0], -3., abs <= EPSILON);
+        assert_float_eq!(m[0][1], 5., abs <= EPSILON);
+        assert_float_eq!(m[1][0], 1., abs <= EPSILON);
+        assert_float_eq!(m[1][1], -2., abs <= EPSILON);
+    }
+
+    #[test]
+    fn identical_matrix_equals() {
+        let m1 = Matrix::new([
+            [1., 2., 3., 4.],
+            [5., 6., 7., 8.],
+            [9., 8., 7., 6.],
+            [5., 4., 3., 2.],
+        ]);
+
+        let m2 = Matrix::new([
+            [1., 2., 3., 4.],
+            [5., 6., 7., 8.],
+            [9., 8., 7., 6.],
+            [5., 4., 3., 2.],
+        ]);
+
+        assert!(m1 == m2);
+    }
+
+    #[test]
+    fn distinct_matrix_doesnt_equals() {
+        let m1 = Matrix::new([
+            [1., 2., 3., 4.],
+            [5., 6., 7., 8.],
+            [9., 8., 7., 6.],
+            [5., 4., 3., 2.],
+        ]);
+
+        let m2 = Matrix::new([
+            [1., 2., 3., 4.],
+            [5., 6., 7., 8.],
+            [8., 7., 6., 5.],
+            [4., 3., 2., 1.],
+        ]);
+
+        assert!(m1 != m2);
+    }
+
+    #[test]
+    fn multiply_matrices() {
+        let m1 = Matrix::new([
+            [1., 2., 3., 4.],
+            [5., 6., 7., 8.],
+            [9., 8., 7., 6.],
+            [5., 4., 3., 2.],
+        ]);
+
+        let m2 = Matrix::new([
+            [-2., 1., 2., 3.],
+            [3., 2., 1., -1.],
+            [4., 3., 6., 5.],
+            [1., 2., 7., 8.],
+        ]);
+
+        let m3 = Matrix::new([
+            [20., 22., 50., 48.],
+            [44., 54., 114., 108.],
+            [40., 58., 110., 102.],
+            [16., 26., 46., 42.],
+        ]);
+
+        let m4 = m1 * m2;
+        assert!(m4 == m3);
     }
 }
